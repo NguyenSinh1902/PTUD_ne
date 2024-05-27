@@ -6,7 +6,7 @@ import { CSVLink } from "react-csv";
 import { upload, uploadScore } from "../../../configs/upload";
 import { useGetStudents } from "../../service/student";
 import { useGetScore, useUpdateFormula, useUpdateScore } from "../../service/score";
-import { useDeleteColumn, useRenameColumn } from "../../service/column";
+import { useAddColumn, useDeleteColumn, useRenameColumn } from "../../service/column";
 
 
 const EditableCell = ({
@@ -94,6 +94,7 @@ const Transcript = () => {
   const { mutate: renameColumn } = useRenameColumn()
   const { mutate: deleteColumn } = useDeleteColumn()
   const { mutate: updateFormula } = useUpdateFormula()
+  const { mutate: addColumn } = useAddColumn()
 
   const isEditing = (record) => record.key === editingKey;
 
@@ -151,13 +152,21 @@ const Transcript = () => {
   };
 
   const handleAddColumn = () => {
-    const newColumn = {
-      title: `Column ${columns.length + 1}`,
-      dataIndex: `column${columns.length + 1}`,
-      width: "10%",
-      editable: true,
-    };
-    setColumns([...columns, newColumn]);
+    addColumn({
+      MaLopHoc: maLopHoc,
+      scores: [{
+        MaSinhVien: scores.student_scores[0].MaSinhVien,
+        TenThanhPhanDiem: "new column",
+        Diem: 0
+      }]
+    }, {
+      onSuccess: () => {
+        refetch()
+      },
+      onError: () => {
+        refetch()
+      }
+    })
   };
 
   const handleRenameColumn = () => {
