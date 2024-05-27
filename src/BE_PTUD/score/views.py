@@ -45,14 +45,20 @@ class GetDanhSachDiem(APIView):
                 'Scores': score_dict if score_dict else None
             })
         # Fetch final score from FinalScore model
-        final_score = FinalScore.objects.filter(MaLopHoc=MaLopHoc).first()
-        final_scores = [{'MaSinhVien': student['MaSinhVien'], 'Final_score': FinalScore.objects.get(MaSinhVien=student['MaSinhVien'], MaLopHoc=MaLopHoc).Diem} for student in result]
+        final_score_column = FinalScore.objects.filter(MaLopHoc=MaLopHoc).first()
+        final_scores = []
+        for student in result:
+            try:
+                final_score = FinalScore.objects.get(MaSinhVien=student['MaSinhVien'], MaLopHoc=MaLopHoc).Diem
+                final_scores.append({'MaSinhVien': student['MaSinhVien'], 'Final_score': final_score})
+            except FinalScore.DoesNotExist:
+                final_scores.append({'MaSinhVien': student['MaSinhVien'], 'Final_score': None})
         return Response({
             'score_columns': score_columns,
             'student_scores': result,
             'TongKet': {
-                'TenCot': final_score.TenCotDiem if final_score else None,
-                'Formula': score_formular.Formular if final_score else None,
+                'TenCot': final_score_column.TenCotDiem if final_score_column else None,
+                'Formula': score_formular.Formular if final_score_column else None,
                 'Scores': final_scores               
             }
         })
