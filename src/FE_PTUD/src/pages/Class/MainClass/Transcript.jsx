@@ -3,141 +3,151 @@ import { Button, Form, Input, Table, Modal, Select } from "antd";
 import { fetchDSSV } from "./fetchDSSV";
 import { useMaLopHoc } from "../../../provider/authContext";
 import { CSVLink } from "react-csv";
-import { upload } from "../../../configs/upload";
+import { upload, uploadScore } from "../../../configs/upload";
+import { useGetStudents } from "../../service/student";
+import { useGetScore, useUpdateFormula, useUpdateScore } from "../../service/score";
+import { useDeleteColumn, useRenameColumn } from "../../service/column";
 
-const EditableContext = React.createContext(null);
-
-const EditableRow = ({ index, ...props }) => {
-  const [form] = Form.useForm();
-  return (
-    <Form form={form} component={false}>
-      <EditableContext.Provider value={form}>
-        <tr {...props} />
-      </EditableContext.Provider>
-    </Form>
-  );
-};
 
 const EditableCell = ({
   title,
-  editable,
-  children,
+  value,
   dataIndex,
-  record,
-  handleSave,
-  ...restProps
+  editing,
 }) => {
-  const [editing, setEditing] = useState(false);
-  const inputRef = useRef(null);
-  const form = useContext(EditableContext);
-
-  useEffect(() => {
-    if (editing) {
-      inputRef.current.focus();
-    }
-  }, [editing]);
-
-  const toggleEdit = () => {
-    setEditing(!editing);
-    form.setFieldsValue({
-      [dataIndex]: record[dataIndex],
-    });
-  };
-
-  const save = async () => {
-    try {
-      const values = await form.validateFields();
-      toggleEdit();
-      handleSave({ ...record, ...values });
-    } catch (errInfo) {
-      console.log("Save failed:", errInfo);
-    }
-  };
-
-  let childNode = children;
-
-  if (editable) {
-    childNode = editing ? (
-      <Form.Item
-        style={{ margin: 0 }}
-        name={dataIndex}
-        rules={[{ required: true, message: `${title} is required.` }]}
-      >
-        <Input ref={inputRef} onPressEnter={save} onBlur={save} />
-      </Form.Item>
-    ) : (
-      <div
-        className="editable-cell-value-wrap"
-        style={{ paddingRight: 24 }}
-        onClick={toggleEdit}
-      >
-        {children}
-      </div>
-    );
-  }
-
-  return <td {...restProps}>{childNode}</td>;
+  return editing ? (
+    <Form.Item
+      name={dataIndex}
+      style={{ margin: 0 }}
+      rules={[
+        {
+          required: true,
+          message: `Please input ${title}!`,
+        },
+      ]}
+    >
+      <Input id="number" type="number" min="0" max="10" step="0.5"
+      />
+    </Form.Item>
+  ) : (
+    <div>{value}</div>
+  );
 };
+
+const columnsTemp = [
+  {
+    title: "STT",
+    dataIndex: "STT",
+    width: "4%",
+    align: "center",
+    editable: false,
+  },
+  {
+    title: "Ma Sinh Vien",
+    dataIndex: "MaSinhVien",
+    width: "6%",
+    editable: false,
+    render: (_, prop) => {
+      return <Form.Item name={"MaSinhVien"}
+        style={{ margin: 0 }} >{prop.MaSinhVien}</Form.Item>
+    }
+  },
+  {
+    title: "Ho Va Ten",
+    dataIndex: "HoVaTen",
+    width: "10%",
+    editable: true,
+  },
+  {
+    title: "Ten Khoa",
+    dataIndex: "TenKhoa",
+    width: "10%",
+    editable: true,
+  },
+  // {
+  //   title: "Email",
+  //   dataIndex: "Email",
+  //   width: "15%",
+  //   editable: true,
+  // },
+]
 
 const Transcript = () => {
   const [dataSource, setDataSource] = useState([]);
-  const [columns, setColumns] = useState([
-    {
-      title: "STT",
-      dataIndex: "STT",
-      width: "4%",
-      align: "center",
-      editable: true,
-    },
-    {
-      title: "Ma Sinh Vien",
-      dataIndex: "MaSinhVien",
-      width: "6%",
-      editable: true,
-    },
-    {
-      title: "Ho Va Ten",
-      dataIndex: "HoVaTen",
-      width: "10%",
-      editable: true,
-    },
-    {
-      title: "Ten Khoa",
-      dataIndex: "TenKhoa",
-      width: "10%",
-      editable: true,
-    },
-    {
-      title: "Email",
-      dataIndex: "Email",
-      width: "15%",
-      editable: true,
-    },
-  ]);
+  const [columns, setColumns] = useState(columnsTemp);
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
   const [isRenameModalVisible, setIsRenameModalVisible] = useState(false);
   const [selectedColumnIndex, setSelectedColumnIndex] = useState();
+  const [isSummary, setIsSummary] = useState(false);
+  const [formular, setFormular] = useState("");
   const [newColumnName, setNewColumnName] = useState("");
+  const [oldColumnName, setOldColumnName] = useState("");
+  const [editingKey, setEditingKey] = useState("");
+  const [form] = Form.useForm();
   const [csv, setCSV] = useState([])
 
   const { maLopHoc } = useMaLopHoc();
 
-  const handleSave = (row) => {
-    const newData = [...dataSource];
-    const index = newData.findIndex((item) => row.key === item.key);
-    if (index > -1) {
-      const item = newData[index];
-      if (JSON.stringify(item) !== JSON.stringify(row)) {
-        newData.splice(index, 1, { ...item, ...row });
-        setDataSource(newData);
+  const { data: students } = useGetStudents(maLopHoc)
+  const { data: scores, refetch } = useGetScore(maLopHoc)
+  const { mutate: updateScore } = useUpdateScore(maLopHoc)
+  const { mutate: renameColumn } = useRenameColumn()
+  const { mutate: deleteColumn } = useDeleteColumn()
+  const { mutate: updateFormula } = useUpdateFormula()
+
+  const isEditing = (record) => record.key === editingKey;
+
+  const edit = (key) => {
+    setEditingKey(key);
+    form.setFieldsValue({
+      ...dataSource.find((item) => item.key === key),
+    });
+  };
+
+  const cancel = () => {
+    setEditingKey("");
+  };
+
+
+  const handleSave = (data) => {
+    let arr = Object.entries(data)
+    console.log(arr)
+    const [_, msv] = arr[0]
+    arr = arr.slice(1, arr.length)
+    const sc = arr.map(([key, value]) => {
+      return {
+        'MaSinhVien': msv,
+        'TenThanhPhanDiem': key,
+        'Diem': value
       }
-    }
+    })
+    updateScore({
+      MaLopHoc: maLopHoc,
+      scores: sc
+    }, {
+      onSuccess: () => {
+        refetch()
+        setEditingKey("")
+      },
+      onError: () => {
+        refetch()
+        setEditingKey("")
+      }
+    })
   };
 
   const handleDeleteColumn = () => {
-    const updatedColumns = columns.filter((col, index) => index !== selectedColumnIndex);
-    setColumns(updatedColumns);
-    setIsDeleteModalVisible(false);
+    deleteColumn({
+      MaLopHoc: maLopHoc,
+      column_name: oldColumnName
+    }, {
+      onSuccess: () => {
+        refetch()
+        setIsRenameModalVisible(false);
+        setOldColumnName("")
+        setNewColumnName("")
+      }
+    })
   };
 
   const handleAddColumn = () => {
@@ -151,16 +161,37 @@ const Transcript = () => {
   };
 
   const handleRenameColumn = () => {
-    const updatedColumns = columns.map((col, idx) =>
-      idx === selectedColumnIndex ? { ...col, title: newColumnName } : col
-    );
-    setColumns(updatedColumns);
-    setIsRenameModalVisible(false);
-    setNewColumnName(" ");
-  };
+    if (isSummary) {
+      updateFormula({
+        MaLopHoc: maLopHoc,
+        formular: formular,
+        use_default: "True"
+      }, {
+        onSuccess: () => {
+          refetch()
+          setIsSummary(false)
+          setIsRenameModalVisible(false);
+        }, onError: () => {
+          refetch()
+          setIsSummary(false)
+          setIsRenameModalVisible(false);
+        }
+      })
+    } else {
+      renameColumn({
+        MaLopHoc: maLopHoc,
+        old_column_name: oldColumnName,
+        new_column_name: newColumnName
+      }, {
+        onSuccess: () => {
+          refetch()
+          setIsRenameModalVisible(false);
+          setOldColumnName("")
+          setNewColumnName("")
+        }
+      })
+    }
 
-  const showModal = () => {
-    setIsDeleteModalVisible(true);
   };
 
   const showRenameModal = (index) => {
@@ -169,16 +200,13 @@ const Transcript = () => {
   };
 
   const handleCancel = () => {
+    setOldColumnName("")
+    setNewColumnName("")
+    setIsSummary(false)
     setIsDeleteModalVisible(false);
     setIsRenameModalVisible(false);
   };
 
-  const components = {
-    body: {
-      row: EditableRow,
-      cell: EditableCell,
-    },
-  };
 
   const mergedColumns = columns.map((col, index) => ({
     ...col,
@@ -191,25 +219,38 @@ const Transcript = () => {
     }),
     onHeaderCell: () => ({
       onDoubleClick: () => {
-        showRenameModal(index);
+        if (col.editable) {
+          if (col.title === "Tổng kết") {
+            setIsSummary(true)
+          } else {
+            setOldColumnName(col.title)
+          }
+          showRenameModal(index);
+        }
       },
     }),
   }));
 
   const getCSVFile = () => {
-    const data = dataSource.map(d => {
-      return [d.STT, d.MaSinhVien, d.HoVaTen, d.TenKhoa, d.Email]
+    const data = dataSource.map((d, index) => {
+      if (scores) {
+        return [d.MaSinhVien, ...Object.values(scores.student_scores[index]?.Scores ?? { a: 0, b: 0 }).map(a => a), scores.TongKet.Scores[index].Final_score ?? 0
+        ]
+      } else {
+        return [d.MaSinhVien]
+      }
     })
-
-
-    return [["STT", "MaSinhVien", "HoVaTen", "TenKhoa", "Email"], ...data]
+    if (scores) {
+      return [["MaSinhVien", ...Object.keys(scores.score_columns), "TK"], ...data]
+    }
+    return []
   }
 
   const handleUpload = async (e) => {
     const file = e.target.files[0]
     try {
-      const res = await upload(file, maLopHoc)
-      console.log(res)
+      await uploadScore(file, maLopHoc)
+      refetch()
     } catch (error) {
       console.log(error)
     } finally {
@@ -218,19 +259,74 @@ const Transcript = () => {
   }
 
   useEffect(() => {
-    fetchDSSV(maLopHoc, (response) => {
+    if (students && scores) {
+      setFormular(scores.TongKet.Formula)
+      setColumns([...columnsTemp, ...Object.keys(scores.score_columns).map(key => {
+        return {
+          title: key,
+          dataIndex: key,
+          width: "20%",
+          editable: true,
+          render: (_, record) => {
+            const editable = isEditing(record);
+            return editable ? (
+              <EditableCell
+                title={key}
+                value={record[key] ?? 0}
+                dataIndex={key}
+                editing={editable}
+              />
+            ) : (
+              <div>{record[key] ?? 0}</div>
+            );
+          }
+        }
+      }), {
+        title: scores.TongKet.TenCot,
+        dataIndex: "Final_score",
+        width: "15%",
+        editable: true,
+      }, {
+        title: "Operation",
+        dataIndex: "operation",
+        width: "20%",
+        editable: false,
+        render: (_, record) => {
+          const editable = isEditing(record);
+
+          return editable ? (
+            <span style={{ display: 'flex', gap: "10px" }}>
+              <Form.Item style={{ margin: 0 }}>
+                <Button type="primary" htmlType="submit"
+                >
+                  Save
+                </Button>
+              </Form.Item>
+
+              <Button onClick={cancel}>Cancel</Button>
+            </span>
+          ) : (
+            <span style={{ display: 'flex', gap: "10px" }}>
+              <Button onClick={() => edit(record.key)}>Edit</Button>
+            </span>
+          );
+        },
+      },])
       setDataSource(
-        response.class_students.map((student, index) => ({
+        students.class_students.map((student, index) => ({
           key: index.toString(),
           STT: (index + 1).toString(),
           MaSinhVien: student.MaSinhVien,
           HoVaTen: student.HoVaTen,
           TenKhoa: student.TenKhoa,
           Email: student.Email,
+          ...scores.student_scores[index].Scores,
+          Final_score: scores.TongKet.Scores[index].Final_score
         }))
       );
-    });
-  }, [maLopHoc]);
+    }
+
+  }, [students, scores, editingKey]);
 
   useEffect(() => {
     const data = getCSVFile()
@@ -244,9 +340,6 @@ const Transcript = () => {
       <Button onClick={handleAddColumn} type="primary" style={{ marginBottom: 16, marginLeft: "20px" }}>
         Add a column
       </Button>
-      <Button onClick={showModal} type="primary" style={{ marginBottom: 16, marginLeft: "20px" }}>
-        Delete a column
-      </Button>
       <Modal title="Delete a Column" visible={isDeleteModalVisible} onOk={handleDeleteColumn} onCancel={handleCancel}>
         <Select
           style={{ width: 120 }}
@@ -258,9 +351,6 @@ const Transcript = () => {
           ))}
         </Select>
       </Modal>
-      <Button onClick={showRenameModal} type="primary" style={{ marginBottom: 16, marginLeft: "20px" }}>
-        Rename Column
-      </Button>
       <Button type="primary" style={{ marginBottom: 16, marginLeft: "20px" }} >
         <label htmlFor={"fileSelect"}>Upload</label>
         <input onChange={handleUpload} hidden id="fileSelect" type="file" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" />
@@ -272,7 +362,7 @@ const Transcript = () => {
           data={csv}
         > Download</CSVLink>
       </Button>
-      <Modal title="Rename Column" visible={isRenameModalVisible} onOk={handleRenameColumn} onCancel={handleCancel}>
+      <Modal title="Column Action" visible={isRenameModalVisible} onOk={handleRenameColumn} onCancel={handleCancel}>
         {/* <Select
           onChange={(value) => setSelectedColumnIndex(value)}
           placeholder="Select a column"
@@ -283,20 +373,36 @@ const Transcript = () => {
           ))}
         </Select> */}
         <Input
-          placeholder="New column name"
-          value={newColumnName}
-          onChange={(e) => setNewColumnName(e.target.value)}
+          placeholder={isSummary ? "Formular" : "New column name"}
+          value={isSummary ? formular : newColumnName}
+          onChange={(e) => {
+            if (isSummary) {
+              setFormular(e.target.value)
+            } else {
+              setNewColumnName(e.target.value)
+            }
+
+          }}
         />
+        {!isSummary && <>
+          <p style={{ margin: "10px 0" }}>Or</p>
+          <Button onClick={handleDeleteColumn}>Delete column</Button>
+        </>}
+
       </Modal>
-      <Table
-        components={components}
-        rowClassName={() => "editable-row"}
-        bordered
-        dataSource={dataSource}
-        columns={mergedColumns}
-        style={{ marginLeft: "20px", marginRight: "20px" }}
-        pagination={false}
-      />
+      <Form form={form} onFinish={(data) => {
+        handleSave(data)
+      }}>
+
+        <Table
+          rowClassName={() => "editable-row"}
+          bordered
+          dataSource={dataSource}
+          columns={mergedColumns}
+          style={{ marginLeft: "20px", marginRight: "20px" }}
+          pagination={false}
+        />
+      </Form>
     </div>
   );
 };

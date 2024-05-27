@@ -40,6 +40,7 @@ const StudentList = () => {
   const [editingKey, setEditingKey] = useState("");
   const [form] = Form.useForm();
   const [csv, setCSV] = useState([])
+  const [f, setF] = useState(false)
 
   const isEditing = (record) => record.key === editingKey;
 
@@ -229,8 +230,8 @@ const StudentList = () => {
   const handleUpload = async (e) => {
     const file = e.target.files[0]
     try {
-      const res = await upload(file, maLopHoc)
-      console.log(res)
+      await upload(file, maLopHoc)
+      setF(!f)
     } catch (error) {
       console.log(error)
     } finally {
@@ -251,7 +252,7 @@ const StudentList = () => {
         }))
       );
     });
-  }, [maLopHoc]);
+  }, [maLopHoc, f]);
 
   useEffect(() => {
     const data = getCSVFile()

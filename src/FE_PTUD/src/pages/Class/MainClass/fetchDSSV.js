@@ -5,10 +5,8 @@ export const fetchDSSV = async (maLopHoc, callback) => {
   console.log(`Token: ${token}`);
   try {
     const response = await DS_SinhVienApi.getAll(maLopHoc);
-    console.log(response.data);
 
     const LopHocList = response.data;
-    console.log(LopHocList);
 
     if (response.status === 200) {
       callback(LopHocList);
