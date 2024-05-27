@@ -9,4 +9,6 @@ urlpatterns = [
     path('CreateNewColumnByFormula/', views.CreateNewColumnByFormula.as_view(), name = 'CreateNewColumnByFormula'),  
     path('Statistic/', views.GetStatistic.as_view(), name = 'Statistic'),
     path('UpdateFormular/', views.UpdateFormular.as_view(), name = 'UpdateFormular'),
+    path('RenameColumn/', views.RenameColumn.as_view(), name = 'RenameColumn'),
+    path('DeleteColumn/', views.DeleteColumn.as_view(), name = 'DeleteColumn'),
 ]

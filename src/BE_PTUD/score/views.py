@@ -11,6 +11,7 @@ import pandas as pd
 import io
 from sympy import sympify
 from django.db.models import Avg, Max, Min, Count, Q
+import re
 
 # Create your views here.
 class GetDanhSachDiem(APIView):
@@ -327,3 +328,67 @@ class UpdateFormular(APIView):
 
         return Response({'message': 'Update formular successfully!'}, status=200)
     
+class RenameColumn(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        token = request.auth
+        MaGiangVien = token.user.MaGiangVien
+        MaLopHoc = request.data.get('MaLopHoc')
+        try:
+            classroom = Classroom.objects.get(MaLopHoc=MaLopHoc)
+            if classroom.MaGiangVien.MaGiangVien != MaGiangVien:
+                return Response({'message': 'You do not have permission to rename column for this class!'}, status=403)
+        except Classroom.DoesNotExist:
+            return Response({'message': 'MaLopHoc is not exist!'}, status=400)
+        old_column_name = request.data.get('old_column_name')
+        new_column_name = request.data.get('new_column_name')
+        try:
+            column_code = ColumnCode.objects.get(MaLopHoc=MaLopHoc, TenCotDiem=old_column_name)
+            column_code.TenCotDiem = new_column_name
+            column_code.save()
+            
+            score_formula = ScoreFormular.objects.get(MaLopHoc=MaLopHoc)
+            score_formula.Formular = score_formula.Formular.replace(old_column_name, new_column_name)
+            score_formula.save()
+        except ColumnCode.DoesNotExist:
+            
+            return Response({'message': 'Column does not exist!'}, status=400)
+        
+        return Response({'message': 'Rename column successfully!'}, status=200)
+
+def remove_column_from_formula(formula, column_name):
+    # Xóa tên cột cùng với dấu cộng hoặc trừ trước nó
+    pattern = r'[-+]\s*' + re.escape(column_name)
+    new_formula = re.sub(pattern, '', formula)
+    # Xử lý trường hợp nếu tên cột là phần tử đầu tiên trong công thức
+    new_formula = re.sub(r'^\s*' + re.escape(column_name) + r'\s*\+', '', new_formula)
+    return new_formula
+
+class DeleteColumn(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        token = request.auth
+        MaGiangVien = token.user.MaGiangVien
+        MaLopHoc = request.data.get('MaLopHoc')
+        try:
+            classroom = Classroom.objects.get(MaLopHoc=MaLopHoc)
+            if classroom.MaGiangVien.MaGiangVien != MaGiangVien:
+                return Response({'message': 'You do not have permission to delete column for this class!'}, status=403)
+        except Classroom.DoesNotExist:
+            return Response({'message': 'MaLopHoc is not exist!'}, status=400)
+        column_name = request.data.get('column_name')
+        try:
+            column_code = ColumnCode.objects.get(MaLopHoc=MaLopHoc, TenCotDiem=column_name)
+            column_code.delete()
+            
+            score_formula = ScoreFormular.objects.get(MaLopHoc=MaLopHoc)
+            score_formula.Formular = remove_column_from_formula(score_formula.Formular, column_name)
+            score_formula.save()
+        except ColumnCode.DoesNotExist:
+            return Response({'message': 'Column does not exist!'}, status=400)
+        
+        return Response({'message': 'Delete column successfully!'}, status=200)    
