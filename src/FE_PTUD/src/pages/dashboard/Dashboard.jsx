@@ -45,9 +45,9 @@ const Dashboard = () => {
       }
       const response = await LopHocApi.add(values, {
         headers: {
-            Authorization: `Token ${token}`,
+          Authorization: `Token ${token}`,
         },
-    });
+      });
       console.log(response);
       setClasses([...classes, values]);
       form.resetFields();
@@ -107,14 +107,14 @@ const Dashboard = () => {
     const fetchMonHocs = async () => {
       const token = localStorage.getItem("token");
       console.log(`Token: ${token}`);
-  
+
       try {
         const response = await MonHocApi.getAll({
           headers: {
             Authorization: `Token ${token}`,
           },
         });
-  
+
         const MonHocList = JSON.parse(response.data);
         console.log(MonHocList);
         if (Array.isArray(MonHocList.subjects)) {
@@ -129,7 +129,7 @@ const Dashboard = () => {
     };
     fetchMonHocs();
   }, []);
-  
+
 
 
   return (
@@ -139,6 +139,7 @@ const Dashboard = () => {
         flexDirection: "column",
         alignItems: "center",
         padding: "20px",
+        overflow: "auto"
       }}
     >
       <div
@@ -164,8 +165,8 @@ const Dashboard = () => {
           <Card
             key={index}
             title={
-              <Link 
-                to={`/class#StudentList?MaLopHoc=${classItem.MaLopHoc}`} 
+              <Link
+                to={`/class#StudentList?MaLopHoc=${classItem.MaLopHoc}`}
                 style={linkStyle}
                 onClick={() => handleLinkClick(classItem.MaLopHoc)}
               >
@@ -320,7 +321,7 @@ const Dashboard = () => {
             </Select>
           </Form.Item>
 
-          
+
 
           <Form.Item
             name="SoTinChi"

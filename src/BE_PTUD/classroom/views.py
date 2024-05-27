@@ -6,6 +6,7 @@ from rest_framework.authentication import TokenAuthentication
 from .models import Classroom
 from subject.models import Subject
 from teacher.models import Teacher
+from score.models import ScoreFormular
 import json
 
 # Create your views here.
@@ -70,6 +71,7 @@ class AddLopHoc(APIView):
             teacher_instance = Teacher.objects.get(MaGiangVien=MaGiangVien)
             new_class = Classroom(MaGiangVien=teacher_instance, TenLopHoc=TenLopHoc, TenPhongHoc=TenPhongHoc, MaMonHoc=subject_instance, NamHoc=NamHoc, HocKy=HocKy)
             new_class.save()
+            ScoreFormular.objects.create(MaLopHoc=new_class, Formular='')
         except Exception as e:
             return Response({'error': str(e)}, status=500)
         
